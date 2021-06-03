@@ -1,6 +1,6 @@
 # A Rule Learning Approach for Detecting Faults in Highly Configurable Software Systems from Uniform Random Samples
 
-This repository includes the material to reproduce the experiments corresponding to the paper:
+This repository includes the material needed to reproduce the experiments corresponding to the paper:
 
 Ruben Heradio, David Fernandez-Amoros, Victoria Ruiz, and Manuel J. Cobo. *A Rule Learning Approach for Detecting Faults in Highly Configurable Software Systems from Uniform Random Samples*. Hawaii International Conference on System Sciences (HICSS), 2022. Hawaii, USA.
 
