@@ -20,6 +20,6 @@ This repository is organized into three directories:
 
 * [script](https://github.com/rheradio/hicss2022-experiments/tree/main/script) includes the [R](https://cran.r-project.org/) script we wrote to run the experiments. Note that the script uses [R Markdown](https://rmarkdown.rstudio.com/).
 * [dataset](https://github.com/rheradio/hicss2022-experiments/tree/main/dataset) includes the JHipster dataset.
-* [report](https://github.com/rheradio/hicss2022-experiments/tree/main/report) includes the [final HTML report](https://htmlpreview.github.io/?https://github.com/rheradio/hicss2022-experiments/blob/main/report/hicss_2020_report.html) generated with our script.
+* [report](https://github.com/rheradio/hicss2022-experiments/tree/main/report) includes the [final HTML report](http://htmlpreview.github.io/?https://github.com/rheradio/hicss2022-experiments/blob/main/report/hicss_2020_report.html) generated with our script.
 
  
