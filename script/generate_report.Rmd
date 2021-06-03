@@ -1,0 +1,255 @@
+---
+title: "A Rule Learning Approach for Detecting Faults in Highly Configurable Software Systems from Uniform Random Samples"
+author: "Ruben Heradio (rheradio@issi.uned.es)"
+date: "Date: `r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    theme: journal
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Summary
+
+This report reproduces the experiments corresponding to the paper:
+
+Ruben Heradio, David Fernandez-Amoros, Victoria Ruiz, and Manuel J. Cobo. *A Rule Learning Approach for Detecting Faults in Highly Configurable Software Systems from Uniform Random Samples*. Hawaii International Conference on System Sciences (HICSS), 2022. Hawaii, USA.
+
+In it, the [JHipster dataset](https://github.com/xdevroey/jhipster-dataset) is analyzed with the following rule induction engines: AQ, CN2, LEM2, PART, and RIPPER
+
+# Initialization
+
+## Importing packages and installing them if needed
+
+```{r package_import, results='hide', warning=FALSE}
+REQUIRED_PACKAGES <- 
+  c("tidyverse",
+    "RoughSets",
+    "RWeka",
+    "gmodels",
+    "caret",
+    "psych",
+    "xtable", 
+    "kableExtra")
+lapply(
+  REQUIRED_PACKAGES,
+  function(pkg) {
+    print(pkg)
+    if (system.file(package = pkg) == "") {
+      install.packages(pkg,
+                       repos = "http://cran.us.r-project.org"
+      )
+    }
+    do.call("library", list(pkg))
+  }
+)
+sessionInfo()
+```
+```{r}
+sessionInfo()
+```
+
+## Constants
+
+```{r global-constants-and-variables-initialization}
+TEST_RESULTS_FILE <- "../dataset/jhipster_3.6.1_test_results.csv"
+RULE_INDUCTION_ALGORITHMS <- c("AQ", "LEM2", "CN2", "JRip", "PART")
+```
+
+# Defining the function that runs and quantifies the performance of the rule learning systems
+
+```{r function-that-tests-a-rule-algorithm}
+check_rule_induction_algorithms <-
+  function(sample_sizes,
+           repetitions = 1,
+           rule_induction_algorithms = RULE_INDUCTION_ALGORITHMS,
+           test_results_file = TEST_RESULTS_FILE) {
+    test_results <- read.csv(test_results_file,
+                             header = TRUE,
+                             sep = ",")
+    
+    test_results <- test_results %>%
+      map( ~ as_factor(.x)) %>%
+      as_tibble()
+    
+    rule_results <-
+      tibble(
+        sample_size = numeric(),
+        rule_algorithm = character(),
+        Accuracy = numeric(),
+        Sensitivity = numeric(),
+        Specificity = numeric(),
+        Precision = numeric(),
+        Kappa = numeric(),
+      )
+    
+    test_results_dt <-
+      SF.asDecisionTable(
+        test_results,
+        decision.attr = ncol(test_results),
+        indx.nominal = 1:ncol(test_results)
+      )
+    
+    for (s in sample_sizes) {
+      writeLines(str_c("Sample size = ", s))
+      for (r in seq_len(repetitions)) {
+        writeLines(str_c("   Repetition = ", r))
+        sample_indices <- sample(nrow(test_results),
+                                 size = s,
+                                 replace = TRUE)
+        sample <- test_results[sample_indices, ]
+        for (ra in rule_induction_algorithms) {
+          writeLines(str_c("Rule induct. algorithm = ", ra))
+          
+          if (ra %in% c("AQ", "LEM2", "CN2")) {
+            sample_dt <-
+              SF.asDecisionTable(
+                sample,
+                decision.attr = ncol(sample),
+                indx.nominal = 1:ncol(sample)
+              )
+            rules <-
+              eval(parse(text = str_c(
+                "RI.", ra, "Rules.RST(sample_dt)"
+              )))
+            predicted <- predict(rules, test_results_dt)
+            predicted$predictions <-
+              as.factor(predicted$predictions)
+            cm <-
+              confusionMatrix(predicted$predictions,
+                              test_results$Test,
+                              positive = "KO")
+            rule_results <- rule_results %>%
+              add_row(
+                sample_size = s,
+                rule_algorithm = ra,
+                Accuracy = cm$overall[[1]],
+                Sensitivity = sensitivity(
+                  predicted$predictions,
+                  test_results$Test,
+                  positive =
+                    "KO"
+                ),
+                Specificity = specificity(
+                  predicted$predictions,
+                  test_results$Test,
+                  positive =
+                    "OK"
+                ) ,
+                Precision = posPredValue(
+                  predicted$predictions,
+                  test_results$Test,
+                  positive =
+                    "KO"
+                ) ,
+                Kappa = cm$overall[[2]],
+              )
+          } else if (ra %in% c("JRip", "PART")) {
+            rules <-
+              eval(parse(text = str_c(ra, "(Test ~., data=sample)")))
+            predicted <- predict(rules, test_results)
+            cm <-
+              confusionMatrix(predicted, test_results$Test, positive = "KO")
+            rule_results <- rule_results %>%
+              add_row(
+                sample_size = s,
+                rule_algorithm = ra,
+                Accuracy = cm$overall[[1]],
+                Sensitivity = sensitivity(predicted, test_results$Test, positive =
+                                            "KO"),
+                Specificity = specificity(predicted, test_results$Test, positive =
+                                            "OK") ,
+                Precision = posPredValue(predicted, test_results$Test, positive =
+                                           "KO") ,
+                Kappa = cm$overall[[2]],
+              )
+          } else {
+            stop(str_c("The rule induction algorithm ", ra, " is not supported"))
+          }
+        }
+      }
+    }
+    rule_results
+  }
+```
+
+# Run the experiments
+```{r run-experiments}
+rule_results <- check_rule_induction_algorithms(
+                  sample_sizes=20:200
+                )
+```
+
+# Experimental results
+
+## Linear models that account for the influence of the rule induction algorithms and the sample size on the performance metrics
+
+```{r linear-models}
+for (m in c("Accuracy", "Sensitivity", "Specificity", "Precision", "Kappa")) {
+  writeLines(m)
+  eval(parse(
+    text = str_c("with(rule_results, describeBy(", m, ", rule_algorithm))")
+  ))
+  eval(parse(
+    text = str_c(
+      "model <- lm(",
+      m,
+      " ~ -1+ rule_algorithm + sample_size, data=rule_results)"
+    )
+  ))
+  print(summary(model))
+}
+```
+
+## Plot showing how the performance measures depend on the sample size and the used rule induction algorithm
+```{r plot-performance-measures-dependecy, warning=FALSE}
+tidied_rule_results <- rule_results %>%
+  gather(Accuracy:Kappa, key = Measure, value = Value) %>%
+  mutate(Measure = fct_recode(Measure,
+                              "Recall/Sensitivity" = "Sensitivity"))
+
+ggplot(tidied_rule_results, aes(x = sample_size, y = Value)) +
+  geom_point(alpha = 0.3, color = "#3388CC") +
+  geom_smooth(se = FALSE, color = "#E91E63", size = 1) +
+  facet_grid(Measure ~ rule_algorithm) +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 200, by = 25)) +
+  coord_cartesian(xlim = c(0, 200), ylim = c(0, 1)) +
+  labs(x = expression("Sample size"),
+       y = expression("Performance measure")) +
+  theme(axis.text.x = element_text (angle = 60, hjust = 1))
+```
+
+## Performance measures of the JRip rules induced from 1,000 samples with 100 configurations
+
+```{r JRIP-100-samples, warning=FALSE}
+rule_results <- check_rule_induction_algorithms(
+  sample_sizes=100,
+  repetitions=1000,
+  rule_induction_algorithms = "JRip",
+)
+desc <- describe(rule_results)
+desc <- desc[-c(1, 2),]
+desc <- desc[,-c(1, 2, 6, 7, 10, 11, 12, 13)]
+print(desc, include.rownames=TRUE, digits=4)
+
+tidied_rule_results <- rule_results %>%
+  gather(Accuracy:Kappa, key = Measure, value = Value) %>%
+  mutate(Measure = fct_recode(Measure,
+                              "Recall/Sensitivity" = "Sensitivity"))
+ggplot(tidied_rule_results, aes(x = Value)) +
+  geom_density(alpha = 0.7, fill = "#3388CC", col="#3388CC") +
+  facet_wrap( Measure ~ ., ncol=2) +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.05)) +
+  labs(x = expression("Performance measure"),
+       y = expression("Density")) +
+  theme(axis.text.x = element_text (angle = 60, hjust = 1))
+
+```
