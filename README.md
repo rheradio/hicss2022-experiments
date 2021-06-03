@@ -20,6 +20,6 @@ This repository is organized into three directories:
 
 * [script](https://github.com/rheradio/sat_sampling/tree/master/scripts), includes the [R](https://cran.r-project.org/) script we wrote to run the experiments. Note that the script uses [R Markdown](https://rmarkdown.rstudio.com/).
 * [dataset](https://github.com/rheradio/sat_sampling/tree/master/experimental_results), includes the JHipster dataset.
-* [report]()
+* [report](), includes the final HTML report generated with our script.
 
  
