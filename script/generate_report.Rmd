@@ -97,16 +97,12 @@ check_rule_induction_algorithms <-
       )
     
     for (s in sample_sizes) {
-      writeLines(str_c("Sample size = ", s))
       for (r in seq_len(repetitions)) {
-        writeLines(str_c("   Repetition = ", r))
         sample_indices <- sample(nrow(test_results),
                                  size = s,
                                  replace = TRUE)
         sample <- test_results[sample_indices, ]
         for (ra in rule_induction_algorithms) {
-          writeLines(str_c("Rule induct. algorithm = ", ra))
-          
           if (ra %in% c("AQ", "LEM2", "CN2")) {
             sample_dt <-
               SF.asDecisionTable(
